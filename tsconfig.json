@@ -1,0 +1,27 @@
+{
+  "display": "Node LTS (24)",
+  "_version": "24.0.0",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "lib": [
+      "es2024",
+      "ESNext.Array",
+      "ESNext.Collection",
+      "ESNext.Iterator"
+    ],
+    "module": "nodenext",
+    "target": "es2022",
+    "strict": true,
+    "outDir": "dist",
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "moduleResolution": "node16",
+    "noEmit": true,
+    "resolveJsonModule": true
+  },
+  "include": ["src"],
+}

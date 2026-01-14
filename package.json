@@ -1,0 +1,55 @@
+{
+  "name": "porter-agent",
+  "version": "1.0.0",
+  "description": "a port forwarding agent",
+  "main": "./dist/index.js",
+  "bin": {
+    "porter": "dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsc -w & ncc build src/index.ts --out dist --watch",
+    "unlink": "npm unlink @sandeepk1729/jarvis -g",
+    "build": "tsc && ncc build src/index.ts --out dist",
+    "prepublishOnly": "npm run build",
+    "lint": "eslint 'src/**/*.ts'"
+  },
+  "keywords": [
+    "port",
+    "agent",
+    "node",
+    "cli"
+  ],
+  "homepage": "https://github.com/SandeepK1729/porter-agent#readme",
+  "bugs": {
+    "url": "https://github.com/SandeepK1729/porter-agent/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SandeepK1729/porter-agent.git"
+  },
+  "author": "SandeepK1729 <SandeepK1729+user@users.noreply.github.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@vercel/ncc": "^0.38.3",
+    "eslint": "^9.35.0",
+    "jiti": "^2.5.1",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2"
+  },
+  "publishConfig": {
+    "access": "public",
+    "directory": "dist",
+    "registry": "https://registry.npmjs.org"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "package.json"
+  ],
+  "dependencies": {
+    "@clack/prompts": "^0.11.0",
+    "commander": "^14.0.0",
+    "lowdb": "^7.0.1"
+  }
+}
