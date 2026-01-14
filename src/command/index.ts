@@ -1,37 +1,104 @@
-import { spawn, SpawnOptions } from "child_process";
 import { Command } from "commander";
-import { spinner } from "@clack/prompts";
+import http from "http";
+import { Buffer } from "node:buffer";
 
-import pkg from '../../package.json';
+import pkg from "../../package.json";
+import client from "@/util/agent";
+import {
+  decodeFrames,
+  decodeTunnelId,
+  encodeFrame,
+  FrameType,
+} from "@/util/buffer";
 
 const jarvis = new Command();
 
-jarvis
-  .name('porter')
-  .description(pkg.description)
-  .version(pkg.version); // <-- Dynamically injected
+jarvis.name("porter").description(pkg.description).version(pkg.version); // <-- Dynamically injected
 
 // 1. add alias
 jarvis
-  .command("alias")
-  .description("Add a new alias")
-  .action(async () => {
-    // const alias: Alias = await aliasInput();
+  .command("http")
+  .arguments("<local-port>")
+  .description("Add http port forwarding")
+  .action(async (localPort) => {
+    /**
+     * Create tunnel
+     */
+    const agentStream = client.request({
+      ":method": "POST",
+      ":path": "/agent",
+    });
 
-    // const s = spinner();
-    // s.start(`Adding alias '${alias}'...`);
+    let buffer = Buffer.alloc(0);
+    let requestId: string | null = null;
 
-    // const result = addAlias(alias);
-    // s.stop(`Added alias '${result.alias}' to run command: '${result.command}'`);
-  });
+    agentStream.on("data", (chunk) => {
+      if (!requestId) {
+        // Extract requestId from the first frame
+        requestId = decodeTunnelId(chunk);
+        console.log("Tunnel established with ID:", requestId);
+        return;
+      }
 
-// 3. list aliases
-jarvis
-  .command("list")
-  .description("List all aliases")
-  .action(() => {
-    const aliases = [{}];
-    console.table(aliases, ["command", "path"]);
+      console.log("Received data from agent");
+      const { remaining, frames } = decodeFrames(
+        Buffer.concat([buffer, chunk])
+      );
+      buffer = remaining;
+
+      frames.forEach((frame) => {
+        if (frame.type !== FrameType.REQUEST) return;
+
+        const options = {
+          method: frame.payload.method,
+          path: frame.payload.path,
+          headers: frame.payload.headers,
+        };
+        // Using ANSI escape codes
+        console.log(`- \x1b[32m${options.method}\x1b[0m \x1b[34m${options.path}\x1b[0m`);
+
+        const proxy = http.request(
+          {
+            hostname: "localhost",
+            port: parseInt(localPort, 10),
+            ...options,
+          },
+          (res) => {
+            let body = "";
+            res.on("data", (c) => (body += c));
+            res.on("end", () => {
+              const obj = {
+                type: FrameType.RESPONSE,
+                requestId: frame.requestId,
+                payload: {
+                  status: res.statusCode,
+                  headers: res.headers,
+                  body,
+                },
+              };
+              const response = encodeFrame(obj);
+              agentStream.write(response);
+            });
+          },
+        );
+
+        proxy.on("error", (err) => {
+          const obj = {
+            type: FrameType.RESPONSE,
+            requestId: frame.requestId,
+            payload: {
+              status: 502,
+              headers: {},
+              body: "Bad Gateway",
+            },
+          };
+          const response = encodeFrame(obj);
+          agentStream.write(response);
+        });
+
+        proxy.end();
+      });
+    });
   });
 
 export default jarvis;
