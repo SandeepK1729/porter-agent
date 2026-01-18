@@ -1,6 +1,6 @@
 {
   "name": "@sandeepk1729/porter",
-  "version": "1.0.1",
+  "version": "0.0.1",
   "description": "a port forwarding agent",
   "main": "./dist/index.js",
   "bin": {
