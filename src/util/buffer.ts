@@ -1,67 +1,58 @@
 import { Buffer } from "node:buffer";
 
 const LENGTH = {
-  TYPE_ID: 1,
-  REQUEST_ID: 8,
   LENGTH_FIELD: 4,
-  TOTAL_FIELD: 13, // TYPE_ID + REQUEST_ID + LENGTH_FIELD
-  TUNNEL_ID: 8,
 };
 
 export enum FrameType {
   REQUEST = 1,
   RESPONSE = 2,
+  REGISTERED = 3,
 }
 
-const encodeFrame = (obj: {
-  type: FrameType;
-  requestId: string;
-  payload: object;
-}): Buffer => {
-  const { type, requestId, payload } = obj;
-  const body = Buffer.from(JSON.stringify(payload));
-  const buf = Buffer.alloc(LENGTH.TOTAL_FIELD + body.length);
+type Register = { type: FrameType.REGISTERED; tunnelId: string };
+type Frame =
+  | { type: FrameType.REQUEST; requestId: string; payload: any }
+  | { type: FrameType.RESPONSE; requestId: string; payload: any }
+  | Register;
 
-  buf.writeUInt8(type, 0);
+const encodeFrame = (frame: Frame): Buffer => {
+  const data = JSON.stringify(frame);
+  const buf = Buffer.allocUnsafe(LENGTH.LENGTH_FIELD + Buffer.byteLength(data));
 
-  const reqIdBytes = Buffer.from(requestId, "utf8");
-  reqIdBytes.copy(buf, LENGTH.TYPE_ID);
+  buf.writeInt32BE(Buffer.byteLength(data), 0);
+  Buffer.from(data).copy(buf, LENGTH.LENGTH_FIELD);
 
-  buf.writeUInt32BE(body.length, LENGTH.TYPE_ID + LENGTH.REQUEST_ID);
-  body.copy(buf, LENGTH.TOTAL_FIELD);
+  console.log(`Encoded frame ${JSON.stringify(frame)} to buffer of length ${buf.length}`);
   return buf;
 };
 
-const decodeTunnelId = (buffer: Buffer): string =>
-  buffer.slice(0, LENGTH.TUNNEL_ID).toString("utf8").trim();
-
 const decodeFrames = (buffer: Buffer) => {
+
   let offset = 0;
-  const frames: { type: FrameType; requestId: string; payload: any }[] = [];
+  let len = buffer.readInt32BE(0);
+  const frames: Frame[] = [];
 
-  while (buffer.length - offset >= LENGTH.TOTAL_FIELD) {
-    const type = buffer.readUInt8(offset);
-    const requestId = buffer
-      .slice(
-        offset + LENGTH.TYPE_ID,
-        offset + LENGTH.TYPE_ID + LENGTH.REQUEST_ID
-      )
-      .toString("utf8");
-    const len = buffer.readUInt32BE(
-      offset + LENGTH.TYPE_ID + LENGTH.REQUEST_ID
-    );
+  while (buffer.length - offset <= LENGTH.LENGTH_FIELD + len) {
+    const body = buffer.slice(offset + LENGTH.LENGTH_FIELD, offset + LENGTH.LENGTH_FIELD + len);
+    frames.push(JSON.parse(body.toString()));
+    offset += LENGTH.LENGTH_FIELD + len;
 
-    if ((buffer.length - offset) < (LENGTH.TOTAL_FIELD + len)) break;
-
-    const body = buffer.slice(
-      offset + LENGTH.TOTAL_FIELD,
-      offset + LENGTH.TOTAL_FIELD + len
-    );
-    frames.push({ type, requestId, payload: JSON.parse(body.toString()) });
-    offset += LENGTH.TOTAL_FIELD + len;
+    if (buffer.length - offset < LENGTH.LENGTH_FIELD) break;
+    len = buffer.readInt32BE(offset);
   }
 
   return { frames, remaining: buffer.slice(offset) };
-};
+}
+
+const decodeTunnelId = (buffer: Buffer): string => {
+  const data = decodeFrames(buffer).frames[0];
+
+  if (data?.type !== FrameType.REGISTERED) {
+    throw new Error("Invalid frame type for tunnel ID");
+  }
+
+  return data.tunnelId;
+}
 
 export { encodeFrame, decodeFrames, decodeTunnelId };
