@@ -1,6 +1,6 @@
 {
   "name": "porter-agent",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "a port forwarding agent",
   "main": "./dist/index.js",
   "bin": {
@@ -47,8 +47,6 @@
     "package.json"
   ],
   "dependencies": {
-    "@clack/prompts": "^0.11.0",
-    "commander": "^14.0.0",
-    "lowdb": "^7.0.1"
+    "commander": "^14.0.0"
   }
 }
