@@ -4,12 +4,12 @@ import pkg from "../../package.json";
 import { upgradeHandler } from "@/util/agent";
 import { caller, REQ_BODY } from "@/config";
 
-const jarvis = new Command();
+const porter = new Command();
 
-jarvis.name("porter").description(pkg.description).version(pkg.version); // <-- Dynamically injected
+porter.name("porter").description(pkg.description).version(pkg.version); // <-- Dynamically injected
 
 // 1. add alias
-jarvis
+porter
   .command("http")
   .arguments("<local-port>")
   .description("Add http port forwarding")
@@ -26,4 +26,4 @@ jarvis
       .end();
   });
 
-export default jarvis;
+export default porter;
