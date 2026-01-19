@@ -16,12 +16,6 @@ porter
   .action(async (localPort) => {
     console.log(`Connecting to porter server and forwarding to local port ${localPort}`);
     caller.request(REQ_BODY)
-      .on("response", (res) => {
-        console.log("Unexpected response from server:", res.statusCode);
-        res.on("data", (chunk) => {
-          console.log("Response body:", chunk.toString());
-        });
-      })
       .on("upgrade", upgradeHandler(localPort))
       .end();
   });
