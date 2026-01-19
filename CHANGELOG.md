@@ -1,3 +1,10 @@
+## [1.1.0](https://github.com/SandeepK1729/porter-agent/compare/v1.0.0...v1.1.0) (2026-01-19)
+
+
+### Features
+
+* ✨ Refactor agent protocol to support streaming frames ([94e1d5d](https://github.com/SandeepK1729/porter-agent/commit/94e1d5dbc12feee43a3ebaff7f0dc4e6f5e2c847))
+
 ## 1.0.0 (2026-01-18)
 
 
