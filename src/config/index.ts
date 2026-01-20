@@ -17,7 +17,6 @@ const serverConfig = {
   host: PORTER_SERVER_HOST,
 }
 
-
 const hostConfig = isLocalHost ? localConfig : serverConfig;
 
 const REQ_BODY = {
@@ -27,10 +26,16 @@ const REQ_BODY = {
   method: "GET",
   headers: {
     Connection: "Upgrade",
-    Upgrade: "tunnel",
+    Upgrade: "h2c",
   },
 };
 
+
 const publicUrl = `http${isLocalHost ? '' : 's'}://${PORTER_SERVER_HOST}/{tunnelId}`;
+
+console.log("🚀 Porter Agent Configuration:", {
+  REQ_BODY,
+  publicUrl,
+});
 
 export { REQ_BODY, caller, publicUrl };

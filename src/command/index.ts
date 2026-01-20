@@ -1,7 +1,7 @@
 import { Command } from "commander";
 
 import pkg from "../../package.json";
-import { upgradeHandler } from "@/util/agent";
+import { caller_request, createAgentSession, upgradeHandler } from "@/util/agent";
 import { caller, REQ_BODY } from "@/config";
 
 const porter = new Command();
@@ -15,9 +15,10 @@ porter
   .description("Add http port forwarding")
   .action(async (localPort) => {
     console.log(`Connecting to porter server and forwarding to local port ${localPort}`);
-    caller.request(REQ_BODY)
-      .on("upgrade", upgradeHandler(localPort))
-      .end();
+    createAgentSession(`http://localhost:9000`, localPort);
+    // caller_request()
+    //   .on("stream", upgradeHandler(localPort))
+    // ;
   });
 
 export default porter;

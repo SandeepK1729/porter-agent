@@ -1,126 +1,119 @@
 import http from "node:http";
+import http2 from "node:http2";
 import { Socket } from "node:net";
 import { decodeFrames, decodeTunnelId, encodeFrame, FrameType } from "./buffer";
-import { publicUrl } from "@/config";
+import { caller, publicUrl, REQ_BODY } from "@/config";
 
 const requests = new Map<string, http.ClientRequest>();
 
-const upgradeHandler =
-  (localPort: string) => (res: http.IncomingMessage, socket: Socket) => {
-    let tunnelId: string | null = null;
-    let buffer = Buffer.alloc(0);
+// Helper to create a new request to the porter server
+// const caller_request = () => 
+//   caller.request(REQ_BODY);
+const caller_request = () => http2.connect(
+  `http://localhost:9000`
+  // `http://${REQ_BODY.host}`
+);
 
+// Create a single long-lived HTTP/2 session to the server
+const createAgentSession = (serverUrl: string, localPort: string) => {
+  const req = caller.request(REQ_BODY);
+  req.end();
+
+  req.on("upgrade", (res, socket: Socket, head: Buffer) => {
     console.log("🚀 Agent connected");
+    const tunnelId = res.headers['x-tunnel-id']?.toString() || "0";
+  
+    console.log(` ⬇️ Forwarding ${publicUrl.replace("{tunnelId}", tunnelId)} -> http://localhost:${localPort}`);
 
-    socket.on("data", (chunk) => {
-      if (!tunnelId) {
-        tunnelId = decodeTunnelId(Buffer.concat([buffer, chunk]));
-        console.log(
-          `⬇️ Forwarding ${publicUrl.replace("{tunnelId}", tunnelId)} -> http://localhost:${localPort}`,
-        );
-        buffer = Buffer.alloc(0);
-        return;
-      }
+    
+    console.log("Server response headers:", res.headers);
+    console.log("Head:", head.toString());
 
-      const { frames, remaining } = decodeFrames(
-        Buffer.concat([buffer, chunk]),
-      );
-      buffer = remaining;
+    // Wrap upgraded socket in H2 client
+    const session = http2.connect(serverUrl, {
+      createConnection: () => socket,
+    });
 
-      frames.forEach((frame) => {
-        if (
-          frame.type < FrameType.REQUEST_START ||
-          frame.type > FrameType.REQUEST_END
-        )
-          return;
+    session.on("stream", handleStream(localPort));
 
-        if (frame.type === FrameType.REQUEST_START) {
-          const options = {
-            host: "localhost",
-            port: parseInt(localPort, 10),
-            method: frame.payload.method,
-            path: frame.payload.path,
-            headers: sanitizeHeaders(frame.payload.headers, localPort),
-          };
+    session.on("error", (err) => {
+      console.error("Agent session error:", err);
+      session.destroy();
+    });
 
-          // console.log(`➡️  Incoming request for tunnel ${tunnelId}: `, options);
-          // Using ANSI escape codes
-          console.log(
-            `- \x1b[32m${options.method}\x1b[0m \x1b[34m${options.path}\x1b[0m`,
-          );
+    session.on("close", () => {
+      console.log("Agent session closed, reconnecting...");
+      // TODO: Reconnect logic
+    });
 
-          const proxy = http.request(options, (res) => {
-            // send response start
-            socket.write(
-              encodeFrame({
-                type: FrameType.RESPONSE_START as const,
-                requestId: frame.requestId,
-                payload: {
-                  status: res.statusCode || 500,
-                  headers: res.headers,
-                },
-              }),
-            );
+    return session;
+  });
+  req.on("error", (err) => {
+    console.error("Agent request error:", err);
+  });
+};
 
-            // pipe response data
-            res.on("data", (c) =>
-              socket.write(
-                encodeFrame({
-                  type: FrameType.RESPONSE_DATA as const,
-                  requestId: frame.requestId,
-                  payload: c,
-                }),
-              ),
-            );
-
-            // response end
-            res.on("end", () => {
-              socket.write(
-                encodeFrame({
-                  type: FrameType.RESPONSE_END as const,
-                  requestId: frame.requestId,
-                }),
-              );
-            });
+// Handle incoming streams from server
+const handleStream =
+  (localPort: string) =>
+    (stream: http2.ServerHttp2Stream, headers: http2.IncomingHttpHeaders) => {
+      const proxyReq = http.request(
+        {
+          host: "localhost",
+          port: localPort,
+          method: headers[":method"],
+          path: headers[":path"],
+          headers: sanitizeHeaders(headers, localPort),
+        },
+        (proxyRes) => {
+          stream.respond({
+            ":status": proxyRes.statusCode || 500,
+            ...proxyRes.headers,
           });
-
-          proxy.on("error", (err) => {
-            socket.write(
-              encodeFrame({
-                type: FrameType.RESPONSE_START as const,
-                requestId: frame.requestId,
-                payload: {
-                  status: 502,
-                  headers: {},
-                  body: "Bad Gateway: " + err.message,
-                },
-              }),
-            );
-
-            socket.write(
-              encodeFrame({
-                type: FrameType.RESPONSE_END as const,
-                requestId: frame.requestId,
-              }),
-            );
-          });
-
-          requests.set(frame.requestId, proxy);
-        } else if (frame.type === FrameType.REQUEST_DATA) {
-          requests.get(frame.requestId)?.write(frame.payload);
-        } else if (frame.type === FrameType.REQUEST_END) {
-          requests.get(frame.requestId)?.end();
-          requests.delete(frame.requestId);
+          proxyRes.pipe(stream);
         }
+      );
+
+      stream.pipe(proxyReq);
+
+      stream.on("close", () => proxyReq.destroy());
+      stream.on("error", (err) => {
+        console.error("Stream error:", err.message);
+        proxyReq.destroy();
       });
-    });
 
-    socket.on("error", (err) => {
-      console.error("Socket error:", err);
-    });
+      proxyReq.on("error", (err) => {
+        console.error("Proxy request error:", err.message);
+        stream.close(http2.constants.NGHTTP2_INTERNAL_ERROR);
+      });
+    };
 
-    socket.on("close", () => {
-      console.log("🚪 Agent disconnected");
+const upgradeHandler =
+  (localPort: string) => (stream: http2.ServerHttp2Stream, headers: http2.IncomingHttpHeaders) => {
+    const proxyReq = http.request(
+      {
+        host: "localhost",
+        port: localPort,
+        method: headers[":method"],
+        path: headers[":path"],
+        headers: sanitizeHeaders(headers, localPort),
+      },
+      (proxyRes) => {
+        stream.respond({
+          ":status": proxyRes.statusCode || 500,
+          ...proxyRes.headers,
+        });
+
+        proxyRes.pipe(stream);
+      }
+    );
+
+    stream.pipe(proxyReq);
+
+    stream.on("close", () => proxyReq.destroy());
+    stream.on("error", (err) => {
+      console.log("Stream error", err);
+      proxyReq.destroy();
     });
   };
 
@@ -145,4 +138,4 @@ const sanitizeHeaders = (headers: any, port: string) => {
   return clean;
 };
 
-export { upgradeHandler };
+export { caller_request, upgradeHandler, createAgentSession };
