@@ -2,6 +2,7 @@ import http from "node:http";
 import { Socket } from "node:net";
 import { decodeFrames, decodeTunnelId, encodeFrame, FrameType } from "./buffer";
 import { publicUrl } from "@/config";
+import { agentEvents } from "@/ui/events";
 
 const requests = new Map<string, http.ClientRequest>();
 
@@ -49,7 +50,21 @@ const upgradeHandler =
             `- \x1b[32m${options.method}\x1b[0m \x1b[34m${options.path}\x1b[0m`,
           );
 
+          agentEvents.emit("request-start", {
+            requestId: frame.requestId,
+            method: frame.payload.method,
+            path: frame.payload.path,
+            headers: frame.payload.headers,
+            timestamp: Date.now(),
+          });
+
           const proxy = http.request(options, (res) => {
+            agentEvents.emit("response-start", {
+              requestId: frame.requestId,
+              status: res.statusCode ?? 500,
+              headers: res.headers,
+            });
+
             // send response start
             socket.write(
               encodeFrame({
@@ -63,18 +78,23 @@ const upgradeHandler =
             );
 
             // pipe response data
-            res.on("data", (c) =>
+            res.on("data", (c: Buffer) => {
+              agentEvents.emit("response-data", {
+                requestId: frame.requestId,
+                chunk: c.toString("base64"),
+              });
               socket.write(
                 encodeFrame({
                   type: FrameType.RESPONSE_DATA as const,
                   requestId: frame.requestId,
                   payload: c,
                 }),
-              ),
-            );
+              );
+            });
 
             // response end
             res.on("end", () => {
+              agentEvents.emit("response-end", { requestId: frame.requestId });
               socket.write(
                 encodeFrame({
                   type: FrameType.RESPONSE_END as const,
@@ -85,6 +105,13 @@ const upgradeHandler =
           });
 
           proxy.on("error", (err) => {
+            agentEvents.emit("response-start", {
+              requestId: frame.requestId,
+              status: 502,
+              headers: {},
+            });
+            agentEvents.emit("response-end", { requestId: frame.requestId });
+
             socket.write(
               encodeFrame({
                 type: FrameType.RESPONSE_START as const,
@@ -107,8 +134,13 @@ const upgradeHandler =
 
           requests.set(frame.requestId, proxy);
         } else if (frame.type === FrameType.REQUEST_DATA) {
+          agentEvents.emit("request-data", {
+            requestId: frame.requestId,
+            chunk: (frame.payload as Buffer).toString("base64"),
+          });
           requests.get(frame.requestId)?.write(frame.payload);
         } else if (frame.type === FrameType.REQUEST_END) {
+          agentEvents.emit("request-end", { requestId: frame.requestId });
           requests.get(frame.requestId)?.end();
           requests.delete(frame.requestId);
         }
