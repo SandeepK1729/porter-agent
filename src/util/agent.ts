@@ -147,15 +147,41 @@ const upgradeHandler =
     }
 
     const getEventPayload = (frame: Frame) => {
+      const base = {
+        requestId: frame.requestId,
+        tunnelId: tunnelId!,
+        timestamp: Date.now(),
+      };
+
       switch (frame.type) {
         case FrameType.REQUEST_START:
           return {
-            requestId: frame.requestId,
+            ...base,
             method: frame.payload.method,
             path: frame.payload.path,
             headers: frame.payload.headers,
             timestamp: Date.now(),
           }
+        case FrameType.RESPONSE_START:
+          return {
+            ...base,
+            status: frame.payload.status,
+            headers: frame.payload.headers,
+            timestamp: Date.now(),
+          }
+        case FrameType.REQUEST_DATA:
+        case FrameType.RESPONSE_DATA:
+          return {
+            ...base,
+            chunk: frame.payload.toString("base64"),
+          }
+        case FrameType.REQUEST_END:
+        case FrameType.RESPONSE_END:
+          return {
+            ...base,
+          }
+        default:
+          return base;
       }
     };
 
