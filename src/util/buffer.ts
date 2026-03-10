@@ -25,7 +25,7 @@ type ConnectionStartPayload = any;
 type ConnectionDataPayload = Buffer;
 type ConnectionEndPayload = undefined;
 
-type Frame =
+export type Frame =
   // Tunnel initialization frame
   | { type: FrameType.TUNNEL_INIT; requestId: "00000000"; payload: TunnelInitPayload; }
   // Request start or response start frame
