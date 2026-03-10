@@ -16,7 +16,12 @@ porter
   .description("Add http port forwarding")
   .option("--ui-port <port>", "Port for the web UI dashboard", "7676")
   .action(async (localPort, options: { uiPort: string }) => {
-    startUIServer(parseInt(options.uiPort, 10));
+    const uiPort = parseInt(options.uiPort, 10);
+    if (isNaN(uiPort) || uiPort < 1 || uiPort > 65535) {
+      console.error(`Invalid --ui-port value: "${options.uiPort}". Must be a number between 1 and 65535.`);
+      process.exit(1);
+    }
+    startUIServer(uiPort);
     console.log(`Connecting to porter server and forwarding to local port ${localPort}`);
     caller.request(REQ_BODY)
       .on("error", (err) =>

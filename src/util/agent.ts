@@ -160,14 +160,12 @@ const upgradeHandler =
             method: frame.payload.method,
             path: frame.payload.path,
             headers: frame.payload.headers,
-            timestamp: Date.now(),
           }
         case FrameType.RESPONSE_START:
           return {
             ...base,
             status: frame.payload.status,
             headers: frame.payload.headers,
-            timestamp: Date.now(),
           }
         case FrameType.REQUEST_DATA:
         case FrameType.RESPONSE_DATA:

@@ -47,6 +47,9 @@
     "package.json"
   ],
   "dependencies": {
-    "commander": "^14.0.0"
+    "commander": "^14.0.0",
+    "htmx-ext-sse": "^2.2.2",
+    "htmx.org": "^2.0.4",
+    "hyperscript.org": "^0.9.13"
   }
 }
