@@ -1,3 +1,15 @@
+## [1.2.0](https://github.com/SandeepK1729/porter-agent/compare/v1.1.0...v1.2.0) (2026-03-12)
+
+
+### Features
+
+* add web UI dashboard for live traffic inspection ([#2](https://github.com/SandeepK1729/porter-agent/issues/2)) ([1934e58](https://github.com/SandeepK1729/porter-agent/commit/1934e5834b6a532083081a65b6057ceb63d047d9))
+
+
+### Other Changes
+
+* **dx:** ♻️ update unlink script to use porter package ([8d7c4b4](https://github.com/SandeepK1729/porter-agent/commit/8d7c4b4f1c2e4fc6e316a6acda8d7cc628593b99))
+
 ## [1.1.0](https://github.com/SandeepK1729/porter-agent/compare/v1.0.0...v1.1.0) (2026-01-19)
 
 
