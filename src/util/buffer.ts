@@ -1,10 +1,5 @@
 import { Buffer } from "node:buffer";
 
-
-const LENGTH = {
-  LENGTH_FIELD: 4,
-};
-
 export enum FrameType {
   // Tunnel initialization
   TUNNEL_INIT = 0,
@@ -20,12 +15,41 @@ export enum FrameType {
   RESPONSE_END = 6,
 }
 
+export enum EventType {
+  REQUEST_START = "request-start",
+  REQUEST_DATA = "request-data",
+  REQUEST_END = "request-end",
+  RESPONSE_START = "response-start",
+  RESPONSE_DATA = "response-data",
+  RESPONSE_END = "response-end",
+  
+  UNKNOWN = "unknown-event",
+}
+
+const FrameName = {
+  [FrameType.TUNNEL_INIT]: EventType.REQUEST_START, // Not really an event, but we can reuse the payload structure
+  [FrameType.REQUEST_START]: EventType.REQUEST_START,
+  [FrameType.REQUEST_DATA]: EventType.REQUEST_DATA,
+  [FrameType.REQUEST_END]: EventType.REQUEST_END,
+  [FrameType.RESPONSE_START]: EventType.RESPONSE_START,
+  [FrameType.RESPONSE_DATA]: EventType.RESPONSE_DATA,
+  [FrameType.RESPONSE_END]: EventType.RESPONSE_END,
+}
+
+export const getEventName = (type: FrameType): EventType => {
+  if (type in FrameName) {
+    return FrameName[type as FrameType];
+  }
+  return EventType.UNKNOWN;
+}
+
+
 type TunnelInitPayload = { tunnelId: string; };
-type ConnectionStartPayload = any;
+export type ConnectionStartPayload = any;
 type ConnectionDataPayload = Buffer;
 type ConnectionEndPayload = undefined;
 
-type Frame =
+export type Frame =
   // Tunnel initialization frame
   | { type: FrameType.TUNNEL_INIT; requestId: "00000000"; payload: TunnelInitPayload; }
   // Request start or response start frame

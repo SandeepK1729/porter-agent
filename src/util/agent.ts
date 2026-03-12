@@ -1,12 +1,14 @@
 import http from "node:http";
 import { Socket } from "node:net";
-import { decodeFrames, decodeTunnelId, encodeFrame, FrameType } from "./buffer";
+import { decodeFrames, decodeTunnelId, encodeFrame, Frame, FrameType, getEventName } from "./buffer";
 import { publicUrl } from "@/config";
+import { agentEvents } from "@/ui/events";
 
 const requests = new Map<string, http.ClientRequest>();
 
 const upgradeHandler =
   (localPort: string) => (res: http.IncomingMessage, socket: Socket) => {
+
     let tunnelId: string | null = null;
     let buffer = Buffer.alloc(0);
 
@@ -49,66 +51,74 @@ const upgradeHandler =
             `- \x1b[32m${options.method}\x1b[0m \x1b[34m${options.path}\x1b[0m`,
           );
 
+          tunnelFrame({
+            requestId: frame.requestId,
+            type: FrameType.REQUEST_START,
+            payload: frame.payload,
+          });
+
           const proxy = http.request(options, (res) => {
+
             // send response start
-            socket.write(
-              encodeFrame({
-                type: FrameType.RESPONSE_START as const,
-                requestId: frame.requestId,
-                payload: {
-                  status: res.statusCode || 500,
-                  headers: res.headers,
-                },
-              }),
-            );
+            tunnelFrame({
+              requestId: frame.requestId,
+              type: FrameType.RESPONSE_START,
+              payload: {
+                status: res.statusCode || 500,
+                headers: res.headers,
+              },
+            });
 
             // pipe response data
-            res.on("data", (c) =>
-              socket.write(
-                encodeFrame({
-                  type: FrameType.RESPONSE_DATA as const,
-                  requestId: frame.requestId,
-                  payload: c,
-                }),
-              ),
-            );
+            res.on("data", (c: Buffer) => {
+              // send response data
+              tunnelFrame({
+                requestId: frame.requestId,
+                type: FrameType.RESPONSE_DATA,
+                payload: c,
+              });
+
+            });
 
             // response end
             res.on("end", () => {
-              socket.write(
-                encodeFrame({
-                  type: FrameType.RESPONSE_END as const,
-                  requestId: frame.requestId,
-                }),
-              );
+              tunnelFrame({
+                requestId: frame.requestId,
+                type: FrameType.RESPONSE_END,
+              });
             });
           });
 
           proxy.on("error", (err) => {
-            socket.write(
-              encodeFrame({
-                type: FrameType.RESPONSE_START as const,
-                requestId: frame.requestId,
-                payload: {
-                  status: 502,
-                  headers: {},
-                  body: "Bad Gateway: " + err.message,
-                },
-              }),
-            );
+            tunnelFrame({
+              requestId: frame.requestId,
+              type: FrameType.RESPONSE_START,
+              payload: {
+                status: 502,
+                headers: {},
+                body: "Bad Gateway: " + err.message,
+              },
+            });
 
-            socket.write(
-              encodeFrame({
-                type: FrameType.RESPONSE_END as const,
-                requestId: frame.requestId,
-              }),
-            );
+            tunnelFrame({
+              requestId: frame.requestId,
+              type: FrameType.RESPONSE_END,
+            });
           });
 
           requests.set(frame.requestId, proxy);
         } else if (frame.type === FrameType.REQUEST_DATA) {
+          tunnelFrame({
+            requestId: frame.requestId,
+            type: FrameType.REQUEST_DATA,
+            payload: frame.payload,
+          });
           requests.get(frame.requestId)?.write(frame.payload);
         } else if (frame.type === FrameType.REQUEST_END) {
+          tunnelFrame({
+            requestId: frame.requestId,
+            type: FrameType.REQUEST_END,
+          });
           requests.get(frame.requestId)?.end();
           requests.delete(frame.requestId);
         }
@@ -122,6 +132,24 @@ const upgradeHandler =
     socket.on("close", () => {
       console.log("🚪 Agent disconnected");
     });
+
+    const tunnelFrame = (frame: Frame) => {
+      // Only allow response frames to be sent back to the agent to prevent request spoofing
+      if (
+        (frame.type === FrameType.RESPONSE_START ||
+          frame.type === FrameType.RESPONSE_DATA ||
+          frame.type === FrameType.RESPONSE_END)
+      ) {
+        socket.write(encodeFrame(frame));
+      }
+
+      const eventPayload = {
+        ...frame,
+        timestamp: Date.now(),
+      };
+
+      agentEvents.emit(getEventName(frame.type), eventPayload);
+    }
   };
 
 const sanitizeHeaders = (headers: any, port: string) => {
