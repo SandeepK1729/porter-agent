@@ -123,9 +123,12 @@ function bodyHtml(chunks: string[]): string {
  * A single request row. If `oobSpec` is provided the element gets
  * `hx-swap-oob` so HTMX applies it as an out-of-band DOM patch.
  *
- * Hyperscript `_` attribute handles:
- *  - removing .active from all rows, then adding it to the clicked row
- *  - removing .center from #detail-panel so it switches to content layout
+ * Click behaviour is handled by a delegated listener on #list-panel
+ * (see the inline script at the bottom of the page) so that it works
+ * correctly even when rows are continuously added/replaced via SSE OOB
+ * swaps – per-element hx-* attributes would require htmx.process() to
+ * be called after every OOB swap, which the SSE extension does not
+ * guarantee.
  */
 function rowHtml(r: RequestRecord, oobSpec?: string): string {
   const dur = r.endTime ? `${r.endTime - r.startTime}ms` : "&hellip;";
@@ -134,12 +137,8 @@ function rowHtml(r: RequestRecord, oobSpec?: string): string {
     : `<div class="st st-p">&hellip;</div>`;
   const oob = oobSpec ? ` hx-swap-oob="${esc(oobSpec)}"` : "";
   const cls = `req-row${r.done ? "" : " pending"}`;
-  const hs =
-    "on click remove .active from .req-row add .active to me remove .center from #detail-panel";
   return (
-    `<div id="row-${r.requestId}" class="${cls}"${oob}` +
-    ` hx-get="/request/${r.requestId}" hx-target="#detail-panel"` +
-    ` hx-swap="innerHTML" hx-trigger="click" _="${hs}">` +
+    `<div id="row-${r.requestId}" class="${cls}"${oob}>` +
     `<span class="mth ${mthClass(r.method)}">${esc(r.method)}</span>` +
     `<span class="req-path" title="${esc(r.path)}">${esc(r.path)}</span>` +
     `<div class="req-meta">${stHtml}<div class="dur">${dur}</div></div>` +
@@ -321,8 +320,10 @@ agentEvents.on("response-end", (data: { requestId: string }) => {
 //   • <body hx-ext="sse" sse-connect="/events"> – body is the SSE root.
 //   • #sse-sink (hidden) absorbs `ui-update` SSE events; OOB fragments in
 //     those events patch #list-panel rows, #req-count, #empty-msg in-place.
-//   • Each row carries hx-get="/request/{id}" hx-target="#detail-panel"
-//     so clicking fetches server-rendered detail HTML.
+//   • A delegated click listener on #list-panel uses htmx.ajax() to fetch
+//     server-rendered detail HTML into #detail-panel when a row is clicked.
+//     Using delegation rather than per-row hx-get/hx-trigger avoids the
+//     need for htmx.process() to be called after every SSE OOB swap.
 //   • The .detail-content wrapper returned by GET /request/:id carries
 //     sse-swap="response-end-{id}" so HTMX auto-refreshes the detail panel
 //     when that per-request SSE event fires – zero client JS needed.
@@ -462,6 +463,31 @@ main{display:flex;flex:1;overflow:hidden}
   (new rows, count badge, row status patches, etc.).
 -->
 <div id="sse-sink" sse-swap="ui-update" hx-swap="innerHTML" style="display:none"></div>
+
+<!--
+  Row click delegation
+  ───────────────────
+  Rows are injected/replaced continuously via SSE OOB swaps.  The SSE
+  extension does not guarantee that htmx.process() is called on every
+  new/replaced element, so per-element hx-get/hx-trigger attributes
+  are unreliable.  A single delegated listener on the stable #list-panel
+  container works regardless of how many times rows are swapped.
+-->
+<script>
+(function () {
+  document.getElementById('list-panel').addEventListener('click', function (e) {
+    var row = e.target.closest('[id^="row-"]');
+    if (!row) return;
+    document.querySelectorAll('.req-row').forEach(function (r) { r.classList.remove('active'); });
+    row.classList.add('active');
+    document.getElementById('detail-panel').classList.remove('center');
+    htmx.ajax('GET', '/request/' + row.id.replace(/^row-/, ''), {
+      target: '#detail-panel',
+      swap: 'innerHTML',
+    });
+  });
+}());
+<\/script>
 
 </body>
 </html>`;
