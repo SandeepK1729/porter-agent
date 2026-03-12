@@ -1,6 +1,6 @@
 import http from "node:http";
 import { Socket } from "node:net";
-import { decodeFrames, decodeTunnelId, encodeFrame, Frame, FrameType } from "./buffer";
+import { decodeFrames, decodeTunnelId, encodeFrame, Frame, FrameType, getEventName } from "./buffer";
 import { publicUrl } from "@/config";
 import { agentEvents } from "@/ui/events";
 
@@ -143,46 +143,13 @@ const upgradeHandler =
         socket.write(encodeFrame(frame));
       }
 
-      agentEvents.emit(getEventName(frame.type), getEventPayload(frame));
-    }
-
-    const getEventPayload = (frame: Frame) => {
-      const base = {
-        requestId: frame.requestId,
-        tunnelId: tunnelId!,
+      const eventPayload = {
+        ...frame,
         timestamp: Date.now(),
       };
 
-      switch (frame.type) {
-        case FrameType.REQUEST_START:
-          return {
-            ...base,
-            method: frame.payload.method,
-            path: frame.payload.path,
-            headers: frame.payload.headers,
-          }
-        case FrameType.RESPONSE_START:
-          return {
-            ...base,
-            status: frame.payload.status,
-            headers: frame.payload.headers,
-          }
-        case FrameType.REQUEST_DATA:
-        case FrameType.RESPONSE_DATA:
-          return {
-            ...base,
-            chunk: frame.payload.toString("base64"),
-          }
-        case FrameType.REQUEST_END:
-        case FrameType.RESPONSE_END:
-          return {
-            ...base,
-          }
-        default:
-          return base;
-      }
-    };
-
+      agentEvents.emit(getEventName(frame.type), eventPayload);
+    }
   };
 
 const sanitizeHeaders = (headers: any, port: string) => {
@@ -205,24 +172,5 @@ const sanitizeHeaders = (headers: any, port: string) => {
   clean["host"] = `localhost:${port}`;
   return clean;
 };
-
-const getEventName = (type: FrameType) => {
-  switch (type) {
-    case FrameType.REQUEST_START:
-      return "request-start";
-    case FrameType.REQUEST_DATA:
-      return "request-data";
-    case FrameType.REQUEST_END:
-      return "request-end";
-    case FrameType.RESPONSE_START:
-      return "response-start";
-    case FrameType.RESPONSE_DATA:
-      return "response-data";
-    case FrameType.RESPONSE_END:
-      return "response-end";
-    default:
-      return "unknown-event";
-  }
-}
 
 export { upgradeHandler };
