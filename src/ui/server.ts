@@ -1,40 +1,5 @@
 import http from "node:http";
-import { readFileSync } from "node:fs";
 import { agentEvents } from "./events";
-
-// ── Vendor JS served locally (no CDN / internet needed) ──────────────────────
-// These packages are `dependencies` so node_modules is always present.
-// The top-level require.resolve calls let NCC detect and bundle the files
-// as dist/ assets; the try/catch handles the case where they are missing.
-/* eslint-disable @typescript-eslint/no-require-imports */
-let _htmxPath = "", _ssePath = "", _hyperscriptPath = "";
-try {
-  _htmxPath = (require as NodeRequire).resolve("htmx.org/dist/htmx.min.js");
-  _ssePath  = (require as NodeRequire).resolve("htmx-ext-sse/sse.js");
-  _hyperscriptPath = (require as NodeRequire).resolve(
-    "hyperscript.org/dist/_hyperscript.min.js",
-  );
-} catch (err) {
-  console.error(
-    `⚠️  Vendor UI libraries not found: ${(err as Error).message}\n` +
-    `   Run: npm install  (or reinstall @sandeepk1729/porter)`,
-  );
-}
-/* eslint-enable @typescript-eslint/no-require-imports */
-
-function safeReadVendor(path: string, label: string): string {
-  if (!path) return `/* ${label} unavailable */`;
-  try {
-    return readFileSync(path, "utf-8");
-  } catch (err) {
-    console.error(`⚠️  Could not read vendor file "${label}": ${(err as Error).message}`);
-    return `/* ${label} unavailable */`;
-  }
-}
-
-const HTMX_JS        = safeReadVendor(_htmxPath,        "htmx.org");
-const SSE_JS         = safeReadVendor(_ssePath,         "htmx-ext-sse");
-const HYPERSCRIPT_JS = safeReadVendor(_hyperscriptPath, "hyperscript.org");
 
 // ── Server-side request state ─────────────────────────────────────────────────
 interface RequestRecord {
@@ -349,6 +314,9 @@ agentEvents.on("response-end", (data: { requestId: string }) => {
 //   Hyperscript (_hyperscript.org) – declarative DOM interactions via `_=`
 //     attributes: active-row selection, connection status dot, no JS block.
 //
+//   All three libraries are loaded from unpkg CDN via <script> tags so the
+//   dashboard works without any bundled assets or local file serving.
+//
 // Key patterns:
 //   • <body hx-ext="sse" sse-connect="/events"> – body is the SSE root.
 //   • #sse-sink (hidden) absorbs `ui-update` SSE events; OOB fragments in
@@ -367,9 +335,15 @@ const HTML = `<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Porter Agent \u2014 Live Traffic</title>
-<script src="/vendor/htmx.js"><\/script>
-<script src="/vendor/sse.js"><\/script>
-<script src="/vendor/hyperscript.js"><\/script>
+<script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"
+        integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+"
+        crossorigin="anonymous"><\/script>
+<script src="https://unpkg.com/htmx-ext-sse@2.2.2/sse.js"
+        integrity="sha384-fw+eTlCc7suMV/1w/7fr2/PmwElUIt5i82bi+qTiLXvjRXZ2/FkiTNA/w0MhXnGI"
+        crossorigin="anonymous"><\/script>
+<script src="https://unpkg.com/hyperscript.org@0.9.13/dist/_hyperscript.min.js"
+        integrity="sha384-5yQ5JTatiFEgeiEB4mfkRI3oTGtaNpbJGdcciZ4IEYFpLGt8yDsGAd7tKiMwnX9b"
+        crossorigin="anonymous"><\/script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f172a;color:#e2e8f0;height:100vh;display:flex;flex-direction:column;overflow:hidden}
@@ -498,23 +472,6 @@ function startUIServer(port = 7676): http.Server {
   const server = http.createServer(
     (req: http.IncomingMessage, res: http.ServerResponse) => {
       const url = req.url ?? "/";
-
-      // ── GET /vendor/*  (locally-served library scripts) ──────────────────
-      if (url === "/vendor/htmx.js") {
-        res.writeHead(200, { "Content-Type": "application/javascript; charset=utf-8" });
-        res.end(HTMX_JS);
-        return;
-      }
-      if (url === "/vendor/sse.js") {
-        res.writeHead(200, { "Content-Type": "application/javascript; charset=utf-8" });
-        res.end(SSE_JS);
-        return;
-      }
-      if (url === "/vendor/hyperscript.js") {
-        res.writeHead(200, { "Content-Type": "application/javascript; charset=utf-8" });
-        res.end(HYPERSCRIPT_JS);
-        return;
-      }
 
       // ── GET /events  (SSE stream) ─────────────────────────────────────────
       if (url === "/events") {

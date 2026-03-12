@@ -137,6 +137,3 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
-
-# Vendored UI library copies (source comes from npm packages in dependencies)
-src/ui/vendor/
