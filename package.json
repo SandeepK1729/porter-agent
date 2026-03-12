@@ -11,7 +11,8 @@
     "unlink": "npm unlink @sandeepk1729/porter -g",
     "build": "tsc && ncc build src/index.ts --out dist",
     "prepublishOnly": "npm run build",
-    "lint": "eslint 'src/**/*.ts'"
+    "lint": "eslint 'src/**/*.ts'",
+    "test": "vitest run"
   },
   "keywords": [
     "port",
@@ -34,7 +35,8 @@
     "@vercel/ncc": "^0.38.3",
     "eslint": "^9.35.0",
     "prettier": "^3.6.2",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^4.0.18"
   },
   "publishConfig": {
     "access": "public",
