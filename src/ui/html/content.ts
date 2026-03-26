@@ -71,6 +71,7 @@ function detailInnerHtml(r: RequestRecord): string {
     `<span class="mth ${mthClass(r.method)}">${esc(r.method)}</span>` +
     `<span class="s-path">${esc(r.path)}</span>` +
     `${stHtml}<span class="s-dur">${dur}</span>` +
+    `<button class="btn replay-btn" data-request-id="${esc(r.requestId)}" onclick="replayRequest(this)">&#8634; Replay</button>` +
     `</div>` +
     `<div class="section"><div class="section-hdr">Request Headers</div>` +
     `${headersHtml(r.reqHeaders)}</div>` +
@@ -185,6 +186,8 @@ main{display:flex;flex:1;overflow:hidden}
 .summary{display:flex;align-items:center;gap:10px;background:#1e293b;padding:10px 14px;border-radius:8px;margin-bottom:16px;font-size:.875rem;flex-wrap:wrap}
 .summary .s-path{color:#94a3b8;flex:1;word-break:break-all;font-family:monospace;font-size:.8rem}
 .summary .s-dur{font-size:.75rem;color:#64748b}
+.replay-btn{margin-left:auto;font-size:.75rem;padding:3px 10px}
+.replay-btn:disabled{opacity:.5;cursor:wait}
 .section{margin-bottom:18px}
 .section-hdr{font-size:.75rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;display:flex;align-items:center;gap:8px}
 .section-hdr::after{content:"";flex:1;height:1px;background:#334155}
@@ -287,6 +290,12 @@ main{display:flex;flex:1;overflow:hidden}
     });
   });
 }());
+
+function replayRequest(btn) {
+  btn.disabled = true;
+  fetch('/request/' + btn.dataset.requestId + '/replay', { method: 'POST' })
+    .finally(function () { btn.disabled = false; });
+}
 <\/script>
 
 </body>

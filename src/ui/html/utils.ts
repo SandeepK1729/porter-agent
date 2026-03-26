@@ -63,4 +63,4 @@ const bodyHtml = (chunks: string[]): string => {
   return `<div class="body-box"><pre class="body-pre">${esc(prettyBody(raw))}</pre></div>`;
 }
 
-export { esc, mthClass, stClass, headersHtml, bodyHtml };
+export { esc, mthClass, stClass, decodeBodyChunks, headersHtml, bodyHtml };
