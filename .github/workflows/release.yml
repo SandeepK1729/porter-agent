@@ -21,6 +21,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: "npm"
+
+      - name: Install Dependencies
+        run: npm install
+
       - name: Semantic Release Action
         # You may pin to the exact commit or the version.
         # uses: codfish/semantic-release-action@cbd853afe12037afb1306caca9d6b1ab6a58cf2a
