@@ -2,7 +2,7 @@ import http from 'node:http';
 import https from 'node:https';
 
 const {
-  PORTER_SERVER_HOST = "porter-sandeep.fly.dev"
+  PORTER_SERVER_HOST = "porter.thesandeep.in",
 } = process.env;
 
 const isLocalHost = PORTER_SERVER_HOST === "localhost";
@@ -14,7 +14,7 @@ const localConfig = {
 }
 
 const serverConfig = {
-  host: PORTER_SERVER_HOST,
+  host: 'porter-sandeep.fly.dev', // TODO: Update this to the actual server host
 }
 
 
@@ -31,6 +31,8 @@ const REQ_BODY = {
   },
 };
 
-const publicUrl = `http${isLocalHost ? '' : 's'}://${PORTER_SERVER_HOST}/{tunnelId}`;
+const publicUrl = isLocalHost
+  ? `http://localhost/{tunnelId}`
+  : `https://{tunnelId}.${PORTER_SERVER_HOST}`;
 
 export { REQ_BODY, caller, publicUrl };
