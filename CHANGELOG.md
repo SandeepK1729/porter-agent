@@ -1,5 +1,12 @@
 ## 1.3.0 (2026-08-24)
 
+* ci: Add Node setup to release workflow (#7) ([07f6582](https://github.com/SandeepK1729/porter-agent/commit/07f6582)), closes [#7](https://github.com/SandeepK1729/porter-agent/issues/7)
+* ci: Use latest semantic-release image (#6) ([8684f9d](https://github.com/SandeepK1729/porter-agent/commit/8684f9d)), closes [#6](https://github.com/SandeepK1729/porter-agent/issues/6)
+* chore(release): :rocket: 1.3.0 [skip ci] ([47c3952](https://github.com/SandeepK1729/porter-agent/commit/47c3952))
+* feat: ✨ update porter host for tenant based tunneling- #5 (#5) ([8bb5523](https://github.com/SandeepK1729/porter-agent/commit/8bb5523)), closes [#5](https://github.com/SandeepK1729/porter-agent/issues/5) [#5](https://github.com/SandeepK1729/porter-agent/issues/5)
+
+## 1.3.0 (2026-08-24)
+
 * ci: Use latest semantic-release image (#6) ([8684f9d](https://github.com/SandeepK1729/porter-agent/commit/8684f9d)), closes [#6](https://github.com/SandeepK1729/porter-agent/issues/6)
 * feat: ✨ update porter host for tenant based tunneling- #5 (#5) ([8bb5523](https://github.com/SandeepK1729/porter-agent/commit/8bb5523)), closes [#5](https://github.com/SandeepK1729/porter-agent/issues/5) [#5](https://github.com/SandeepK1729/porter-agent/issues/5)
 
