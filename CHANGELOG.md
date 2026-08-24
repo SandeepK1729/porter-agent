@@ -1,3 +1,8 @@
+## 1.3.0 (2026-08-24)
+
+* ci: Use latest semantic-release image (#6) ([8684f9d](https://github.com/SandeepK1729/porter-agent/commit/8684f9d)), closes [#6](https://github.com/SandeepK1729/porter-agent/issues/6)
+* feat: ✨ update porter host for tenant based tunneling- #5 (#5) ([8bb5523](https://github.com/SandeepK1729/porter-agent/commit/8bb5523)), closes [#5](https://github.com/SandeepK1729/porter-agent/issues/5) [#5](https://github.com/SandeepK1729/porter-agent/issues/5)
+
 ## [1.2.0](https://github.com/SandeepK1729/porter-agent/compare/v1.1.0...v1.2.0) (2026-03-12)
 
 
