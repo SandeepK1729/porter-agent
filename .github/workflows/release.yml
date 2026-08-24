@@ -20,6 +20,15 @@ jobs:
       # Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v5
+      
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
 
       - name: Semantic Release Action
         # You may pin to the exact commit or the version.
