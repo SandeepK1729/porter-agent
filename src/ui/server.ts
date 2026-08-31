@@ -1,4 +1,5 @@
 import http from "node:http";
+import crypto from "node:crypto";
 import { agentEvents } from "./events";
 import Storage from './storage';
 import { RequestRecord } from "./types";
@@ -99,9 +100,45 @@ Object.values(EventType).forEach((event) => {
   agentEvents.on(event, (data) => processEvent(event, data));
 });
 
+// ── Replay helpers ────────────────────────────────────────────────────────────
+
+function decodeChunksToBuffer(chunks: string[]): Buffer {
+  if (!chunks.length) return Buffer.alloc(0);
+  try {
+    return Buffer.concat(
+      (chunks as unknown[]).map((c: unknown) =>
+        Buffer.isBuffer(c) ? c : Buffer.from(String(c), "base64"),
+      ),
+    );
+  } catch {
+    return Buffer.from(chunks.join(""));
+  }
+}
+
+function sanitizeForwardHeaders(
+  headers: Record<string, unknown>,
+  port: number,
+): Record<string, string> {
+  const skip = new Set([
+    "connection",
+    "upgrade",
+    "content-length",
+    "accept-encoding",
+    "transfer-encoding",
+  ]);
+  const clean: Record<string, string> = {};
+  for (const [k, v] of Object.entries(headers ?? {})) {
+    const key = k.toLowerCase();
+    if (key.startsWith(":") || skip.has(key)) continue;
+    clean[key] = String(v);
+  }
+  clean["host"] = `localhost:${port}`;
+  return clean;
+}
+
 // ── HTTP server ───────────────────────────────────────────────────────────────
 
-function startUIServer(port = 7676): http.Server {
+function startUIServer(port = 7676, localPort = 3000): http.Server {
   const server = http.createServer(
     (req: http.IncomingMessage, res: http.ServerResponse) => {
       const url = req.url ?? "/";
@@ -160,6 +197,95 @@ function startUIServer(port = 7676): http.Server {
           `<span id="req-count" hx-swap-oob="outerHTML">0 requests</span>`;
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(body);
+        return;
+      }
+
+      // ── POST /request/:id/replay  (rehit a captured request) ─────────────
+      const replayMatch = url.match(/^\/request\/([a-f0-9]+)\/replay$/);
+      if (req.method === "POST" && replayMatch) {
+        const original = records.get(replayMatch[1] ?? "");
+        if (!original) {
+          res.writeHead(404);
+          res.end();
+          return;
+        }
+
+        const newId = crypto.randomUUID().replace(/-/g, "");
+        const startTimestamp = Date.now();
+
+        agentEvents.emit(EventType.REQUEST_START, {
+          requestId: newId,
+          payload: {
+            method: original.method,
+            path: original.path,
+            headers: original.reqHeaders,
+          },
+          timestamp: startTimestamp,
+        });
+
+        const bodyBuffer = decodeChunksToBuffer(original.reqBodyChunks);
+
+        const headers = sanitizeForwardHeaders(original.reqHeaders, localPort);
+        if (bodyBuffer.length > 0) {
+          headers["content-length"] = String(bodyBuffer.length);
+        }
+
+        const proxyReq = http.request(
+          { host: "localhost", port: localPort, method: original.method, path: original.path, headers },
+          (proxyRes) => {
+            agentEvents.emit(EventType.RESPONSE_START, {
+              requestId: newId,
+              payload: { status: proxyRes.statusCode ?? 500, headers: proxyRes.headers },
+              timestamp: Date.now(),
+            });
+
+            proxyRes.on("data", (chunk: Buffer) => {
+              agentEvents.emit(EventType.RESPONSE_DATA, {
+                requestId: newId,
+                payload: chunk.toString("base64"),
+                timestamp: Date.now(),
+              });
+            });
+
+            proxyRes.on("end", () => {
+              agentEvents.emit(EventType.RESPONSE_END, {
+                requestId: newId,
+                timestamp: Date.now(),
+              });
+            });
+          },
+        );
+
+        proxyReq.on("error", (err) => {
+          console.error(`Replay request failed for ${original.method} ${original.path}:`, err.message);
+          agentEvents.emit(EventType.RESPONSE_START, {
+            requestId: newId,
+            payload: { status: 502, headers: {} },
+            timestamp: Date.now(),
+          });
+          agentEvents.emit(EventType.RESPONSE_END, {
+            requestId: newId,
+            timestamp: Date.now(),
+          });
+        });
+
+        if (bodyBuffer.length > 0) {
+          agentEvents.emit(EventType.REQUEST_DATA, {
+            requestId: newId,
+            payload: bodyBuffer.toString("base64"),
+            timestamp: Date.now(),
+          });
+          proxyReq.write(bodyBuffer);
+        }
+
+        agentEvents.emit(EventType.REQUEST_END, {
+          requestId: newId,
+          timestamp: Date.now(),
+        });
+        proxyReq.end();
+
+        res.writeHead(204);
+        res.end();
         return;
       }
 

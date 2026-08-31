@@ -21,7 +21,7 @@ porter
       console.error(`Invalid --ui-port value: "${options.uiPort}". Must be a number between 1 and 65535.`);
       process.exit(1);
     }
-    startUIServer(uiPort);
+    startUIServer(uiPort, parseInt(localPort, 10));
     console.log(`Connecting to porter server and forwarding to local port ${localPort}`);
     caller.request(REQ_BODY)
       .on("error", (err) =>
